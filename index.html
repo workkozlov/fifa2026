@@ -194,6 +194,7 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 
   <div class="actions">
     <button class="btn btn-primary" onclick="goStep(2)">Далее — добавить команды →</button>
+    <button class="btn btn-danger btn-sm" onclick="resetTournament()" style="margin-left:8px">🗑 Сбросить турнир</button>
   </div>
 </div>
 
@@ -446,6 +447,7 @@ function doDraw() {
     }
   }
   renderGroupsDisplay();
+  saveState();
 }
 
 function renderGroupsDisplay() {
@@ -566,9 +568,8 @@ function saveScore(gi, mi) {
   g.teams[m.home].played++; g.teams[m.away].played++;
   renderGroupStandings();
   checkAllGroupsDone();
+  saveState();
 }
-
-function checkAllGroupsDone() {
   const allDone = T.groupMatches.every(gm => gm.every(m => m.done));
   document.getElementById('btn-to-playoff').style.display = allDone ? 'inline-flex' : 'none';
 }
@@ -822,6 +823,7 @@ function saveDEScore(id) {
   }
 
   renderPlayoff();
+  saveState();
 }
 
 function renderPlayoff() {
@@ -980,6 +982,7 @@ function savePlayoffScore(ri, mi) {
     else nextMatch.away = { name: winner.name, seed: winner.seed };
   }
   renderPlayoff();
+  saveState();
 }
 
 function randScore() {
@@ -1011,6 +1014,7 @@ function randomGroupResults() {
   renderGroupStandings();
   renderGroupMatchList();
   checkAllGroupsDone();
+  saveState();
 }
 
 function randomPlayoffRound() {
@@ -1054,11 +1058,22 @@ function randomDERound() {
   });
 }
 
+function resetTournament() {
+  if (!confirm('Сбросить текущий турнир? Все результаты будут удалены.')) return;
+  localStorage.removeItem('fifa_current');
+  T.groups = []; T.groupMatches = []; T.playoffTeams = []; T.playoffMatches = [];
+  T.wb = []; T.lb = []; T.grandFinal = null; T.thirdPlace = null;
+  T.currentStep = 1;
+  goStep(1);
+}
+
 function goStep(n) {
   if (n === 2 && !T.format) { alert('Выберите схему на шаге 1'); return; }
   if (n >= 2 && n <= 5) buildTeamInputs();
   if (n === 4) { renderGroupTabs(); switchGroupTab(0); }
   if (n === 6) renderHistory();
+  T.currentStep = n;
+  saveState();
   document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i === n-1));
   document.querySelectorAll('.step').forEach((s,i) => {
     s.classList.toggle('active', i === n-1);
@@ -1066,8 +1081,64 @@ function goStep(n) {
   });
 }
 
+function saveState() {
+  try {
+    localStorage.setItem('fifa_current', JSON.stringify({
+      mode: T.mode,
+      count: T.count,
+      format: T.format,
+      teams: T.teams,
+      groups: T.groups,
+      groupMatches: T.groupMatches,
+      playoffTeams: T.playoffTeams,
+      playoffMatches: T.playoffMatches,
+      currentGroupTab: T.currentGroupTab,
+      currentStep: T.currentStep || 1,
+      wb: T.wb,
+      lb: T.lb,
+      grandFinal: T.grandFinal,
+      thirdPlace: T.thirdPlace,
+    }));
+  } catch(e) { console.warn('saveState failed', e); }
+}
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem('fifa_current');
+    if (!saved) return false;
+    const s = JSON.parse(saved);
+    Object.assign(T, s);
+    return true;
+  } catch(e) { return false; }
+}
+
 renderFormatGrid();
-selectFormat('20de');
+
+if (loadState() && T.format) {
+  selectFormat(T.format);
+  const step = T.currentStep || 1;
+  if (step >= 4 && T.groups.length) {
+    buildTeamInputs();
+    document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i === step-1));
+    document.querySelectorAll('.step').forEach((s,i) => { s.classList.toggle('active', i === step-1); s.classList.toggle('done', i < step-1); });
+    if (step === 4) { renderGroupTabs(); switchGroupTab(T.currentGroupTab || 0); }
+    if (step === 5) renderPlayoff();
+    if (step === 6) renderHistory();
+  } else if (step === 3 && T.groups.length) {
+    buildTeamInputs();
+    renderGroupsDisplay();
+    document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i === 2));
+    document.querySelectorAll('.step').forEach((s,i) => { s.classList.toggle('active', i === 2); s.classList.toggle('done', i < 2); });
+  } else if (step === 2) {
+    buildTeamInputs();
+    document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i === 1));
+    document.querySelectorAll('.step').forEach((s,i) => { s.classList.toggle('active', i === 1); s.classList.toggle('done', i < 1); });
+  } else {
+    selectFormat(T.format);
+  }
+} else {
+  selectFormat('20de');
+}
 </script>
 </body>
 </html>
