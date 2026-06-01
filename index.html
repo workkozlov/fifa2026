@@ -1112,31 +1112,39 @@ function loadState() {
   } catch(e) { return false; }
 }
 
-renderFormatGrid();
+// Инициализация: сначала загружаем состояние, потом рендерим
+const hasSaved = loadState();
 
-if (loadState() && T.format) {
+if (hasSaved && T.format) {
+  // Восстанавливаем режим кнопок
+  document.getElementById('btn-1v1').classList.toggle('active', T.mode === '1v1');
+  document.getElementById('btn-2v2').classList.toggle('active', T.mode === '2v2');
+  renderFormatGrid();
   selectFormat(T.format);
+
   const step = T.currentStep || 1;
+  const setStep = (n) => {
+    document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i === n-1));
+    document.querySelectorAll('.step').forEach((s,i) => { s.classList.toggle('active', i === n-1); s.classList.toggle('done', i < n-1); });
+  };
+
   if (step >= 4 && T.groups.length) {
     buildTeamInputs();
-    document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i === step-1));
-    document.querySelectorAll('.step').forEach((s,i) => { s.classList.toggle('active', i === step-1); s.classList.toggle('done', i < step-1); });
-    if (step === 4) { renderGroupTabs(); switchGroupTab(T.currentGroupTab || 0); }
+    setStep(step);
+    if (step === 4) { renderGroupTabs(); switchGroupTab(T.currentGroupTab || 0); checkAllGroupsDone(); }
     if (step === 5) renderPlayoff();
     if (step === 6) renderHistory();
   } else if (step === 3 && T.groups.length) {
     buildTeamInputs();
     renderGroupsDisplay();
-    document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i === 2));
-    document.querySelectorAll('.step').forEach((s,i) => { s.classList.toggle('active', i === 2); s.classList.toggle('done', i < 2); });
+    setStep(3);
   } else if (step === 2) {
     buildTeamInputs();
-    document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i === 1));
-    document.querySelectorAll('.step').forEach((s,i) => { s.classList.toggle('active', i === 1); s.classList.toggle('done', i < 1); });
-  } else {
-    selectFormat(T.format);
+    setStep(2);
   }
+  // step === 1 — уже на нужной странице
 } else {
+  renderFormatGrid();
   selectFormat('20de');
 }
 </script>
