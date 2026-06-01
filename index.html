@@ -1116,11 +1116,30 @@ function loadState() {
 const hasSaved = loadState();
 
 if (hasSaved && T.format) {
-  // Восстанавливаем режим кнопок
+  // Восстанавливаем кнопки режима
   document.getElementById('btn-1v1').classList.toggle('active', T.mode === '1v1');
   document.getElementById('btn-2v2').classList.toggle('active', T.mode === '2v2');
+  // Теперь T.mode правильный — рендерим сетку
   renderFormatGrid();
-  selectFormat(T.format);
+  // Подсвечиваем выбранный формат без перезаписи T
+  const fEl = document.getElementById('format-grid');
+  if (fEl) fEl.querySelectorAll('.format-card').forEach(c => c.classList.remove('selected'));
+  const allCards = document.querySelectorAll('.format-card');
+  allCards.forEach(c => {
+    const num = c.querySelector('.format-num')?.textContent;
+    const isDE = c.querySelector('.format-badge') && c.innerHTML.includes('Double Elim');
+    const cardKey = isDE ? (num === '16' ? '16de' : '20de') : (isNaN(num) ? num : parseInt(num));
+    if (String(cardKey) === String(T.format)) c.classList.add('selected');
+  });
+  // Показываем summary
+  const f = FORMATS[T.mode][T.format];
+  if (f) {
+    const sum = document.getElementById('format-summary');
+    sum.style.display = 'block';
+    sum.className = 'notice' + (f.warn ? ' notice-warn' : '');
+    const u = T.mode === '1v1' ? 'участников' : 'пар (' + T.count/2 + ')';
+    sum.textContent = `Выбрано: ${T.count} ${u} · ${f.label}` + (f.de ? ' · Double Elimination' : ` · плей-офф на ${f.playoff}`);
+  }
 
   const step = T.currentStep || 1;
   const setStep = (n) => {
@@ -1142,7 +1161,7 @@ if (hasSaved && T.format) {
     buildTeamInputs();
     setStep(2);
   }
-  // step === 1 — уже на нужной странице
+  // step === 1: уже на нужной странице, схемы нарисованы выше
 } else {
   renderFormatGrid();
   selectFormat('20de');
