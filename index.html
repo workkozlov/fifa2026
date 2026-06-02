@@ -570,6 +570,8 @@ function saveScore(gi, mi) {
   checkAllGroupsDone();
   saveState();
 }
+
+function checkAllGroupsDone() {
   const allDone = T.groupMatches.every(gm => gm.every(m => m.done));
   document.getElementById('btn-to-playoff').style.display = allDone ? 'inline-flex' : 'none';
 }
@@ -1112,60 +1114,51 @@ function loadState() {
   } catch(e) { return false; }
 }
 
-// Инициализация: сначала загружаем состояние, потом рендерим
-const hasSaved = loadState();
+document.addEventListener('DOMContentLoaded', function() {
+  const hasSaved = loadState();
 
-if (hasSaved && T.format) {
-  // Восстанавливаем кнопки режима
-  document.getElementById('btn-1v1').classList.toggle('active', T.mode === '1v1');
-  document.getElementById('btn-2v2').classList.toggle('active', T.mode === '2v2');
-  // Теперь T.mode правильный — рендерим сетку
-  renderFormatGrid();
-  // Подсвечиваем выбранный формат без перезаписи T
-  const fEl = document.getElementById('format-grid');
-  if (fEl) fEl.querySelectorAll('.format-card').forEach(c => c.classList.remove('selected'));
-  const allCards = document.querySelectorAll('.format-card');
-  allCards.forEach(c => {
-    const num = c.querySelector('.format-num')?.textContent;
-    const isDE = c.querySelector('.format-badge') && c.innerHTML.includes('Double Elim');
-    const cardKey = isDE ? (num === '16' ? '16de' : '20de') : (isNaN(num) ? num : parseInt(num));
-    if (String(cardKey) === String(T.format)) c.classList.add('selected');
-  });
-  // Показываем summary
-  const f = FORMATS[T.mode][T.format];
-  if (f) {
-    const sum = document.getElementById('format-summary');
-    sum.style.display = 'block';
-    sum.className = 'notice' + (f.warn ? ' notice-warn' : '');
-    const u = T.mode === '1v1' ? 'участников' : 'пар (' + T.count/2 + ')';
-    sum.textContent = `Выбрано: ${T.count} ${u} · ${f.label}` + (f.de ? ' · Double Elimination' : ` · плей-офф на ${f.playoff}`);
+  if (hasSaved && T.format) {
+    document.getElementById('btn-1v1').classList.toggle('active', T.mode === '1v1');
+    document.getElementById('btn-2v2').classList.toggle('active', T.mode === '2v2');
+    renderFormatGrid();
+    // Подсвечиваем выбранный формат
+    const f = FORMATS[T.mode][T.format];
+    if (f) {
+      document.querySelectorAll('.format-card').forEach(c => {
+        const num = c.querySelector('.format-num')?.textContent;
+        const isDE = c.innerHTML.includes('Double Elim');
+        const key = isDE ? (num === '16' ? '16de' : '20de') : (isNaN(num) ? num : parseInt(num));
+        c.classList.toggle('selected', String(key) === String(T.format));
+      });
+      const sum = document.getElementById('format-summary');
+      sum.style.display = 'block';
+      sum.className = 'notice' + (f.warn ? ' notice-warn' : '');
+      const u = T.mode === '1v1' ? 'участников' : 'пар (' + T.count/2 + ')';
+      sum.textContent = `Выбрано: ${T.count} ${u} · ${f.label}` + (f.de ? ' · Double Elimination' : ` · плей-офф на ${f.playoff}`);
+    }
+
+    const step = T.currentStep || 1;
+    const setStep = (n) => {
+      document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i === n-1));
+      document.querySelectorAll('.step').forEach((s,i) => { s.classList.toggle('active', i === n-1); s.classList.toggle('done', i < n-1); });
+    };
+
+    if (step >= 4 && T.groups.length) {
+      buildTeamInputs();
+      setStep(step);
+      if (step === 4) { renderGroupTabs(); switchGroupTab(T.currentGroupTab || 0); checkAllGroupsDone(); }
+      if (step === 5) renderPlayoff();
+      if (step === 6) renderHistory();
+    } else if (step === 3 && T.groups.length) {
+      buildTeamInputs(); renderGroupsDisplay(); setStep(3);
+    } else if (step === 2) {
+      buildTeamInputs(); setStep(2);
+    }
+  } else {
+    renderFormatGrid();
+    selectFormat('20de');
   }
-
-  const step = T.currentStep || 1;
-  const setStep = (n) => {
-    document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i === n-1));
-    document.querySelectorAll('.step').forEach((s,i) => { s.classList.toggle('active', i === n-1); s.classList.toggle('done', i < n-1); });
-  };
-
-  if (step >= 4 && T.groups.length) {
-    buildTeamInputs();
-    setStep(step);
-    if (step === 4) { renderGroupTabs(); switchGroupTab(T.currentGroupTab || 0); checkAllGroupsDone(); }
-    if (step === 5) renderPlayoff();
-    if (step === 6) renderHistory();
-  } else if (step === 3 && T.groups.length) {
-    buildTeamInputs();
-    renderGroupsDisplay();
-    setStep(3);
-  } else if (step === 2) {
-    buildTeamInputs();
-    setStep(2);
-  }
-  // step === 1: уже на нужной странице, схемы нарисованы выше
-} else {
-  renderFormatGrid();
-  selectFormat('20de');
-}
+});
 </script>
 </body>
 </html>
