@@ -1084,39 +1084,110 @@ function goStep(n) {
   });
 }
 
-function saveState() {
-  try {
-    localStorage.setItem('fifa_current', JSON.stringify({
-      mode: T.mode,
-      count: T.count,
-      format: T.format,
-      teams: T.teams,
-      groups: T.groups,
-      groupMatches: T.groupMatches,
-      playoffTeams: T.playoffTeams,
-      playoffMatches: T.playoffMatches,
-      currentGroupTab: T.currentGroupTab,
-      currentStep: T.currentStep || 1,
-      wb: T.wb,
-      lb: T.lb,
-      grandFinal: T.grandFinal,
-      thirdPlace: T.thirdPlace,
-    }));
-  } catch(e) { console.warn('saveState failed', e); }
+const AT_TOKEN = 'patEsrBav8B2jTKmH.556e6ffde48ff123d7cd05856a3c300f7f17e13b1d037c52882b4d7eb48c37e1';
+const AT_BASE  = 'appKUQa5Rt1CfAzcK';
+const AT_TABLE = 'tblwXH4s4bHDuAXB7';
+const AT_URL   = `https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}`;
+const AT_HEADS = { 'Authorization': `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' };
+
+let atRecordId = null; // ID записи в Airtable
+let syncTimer = null;
+let pendingSave = false;
+
+function getStatePayload() {
+  return {
+    mode: T.mode, count: T.count, format: T.format, teams: T.teams,
+    groups: T.groups, groupMatches: T.groupMatches,
+    playoffTeams: T.playoffTeams, playoffMatches: T.playoffMatches,
+    currentGroupTab: T.currentGroupTab, currentStep: T.currentStep || 1,
+    wb: T.wb, lb: T.lb, grandFinal: T.grandFinal, thirdPlace: T.thirdPlace,
+  };
 }
 
-function loadState() {
+async function saveState() {
+  // Сохраняем локально сразу
+  try { localStorage.setItem('fifa_current', JSON.stringify(getStatePayload())); } catch(e) {}
+  // Airtable — дебаунс 1.5 сек чтобы не спамить API
+  pendingSave = true;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(pushToAirtable, 1500);
+}
+
+async function pushToAirtable() {
+  if (!pendingSave) return;
+  pendingSave = false;
+  const data = JSON.stringify(getStatePayload());
+  try {
+    if (atRecordId) {
+      await fetch(`${AT_URL}/${atRecordId}`, {
+        method: 'PATCH', headers: AT_HEADS,
+        body: JSON.stringify({ fields: { key: 'tournament', data } })
+      });
+    } else {
+      const res = await fetch(AT_URL, {
+        method: 'POST', headers: AT_HEADS,
+        body: JSON.stringify({ fields: { key: 'tournament', data } })
+      });
+      const json = await res.json();
+      atRecordId = json.id;
+    }
+  } catch(e) { console.warn('Airtable save failed', e); }
+}
+
+async function loadState() {
+  // Сначала пробуем Airtable
+  try {
+    const res = await fetch(`${AT_URL}?filterByFormula=%7Bkey%7D%3D%22tournament%22`, { headers: AT_HEADS });
+    const json = await res.json();
+    if (json.records && json.records.length > 0) {
+      const rec = json.records[0];
+      atRecordId = rec.id;
+      if (rec.fields.data) {
+        const s = JSON.parse(rec.fields.data);
+        Object.assign(T, s);
+        // Синхронизируем с localStorage
+        localStorage.setItem('fifa_current', rec.fields.data);
+        return true;
+      }
+    }
+  } catch(e) { console.warn('Airtable load failed, using localStorage', e); }
+  // Fallback на localStorage
   try {
     const saved = localStorage.getItem('fifa_current');
     if (!saved) return false;
-    const s = JSON.parse(saved);
-    Object.assign(T, s);
+    Object.assign(T, JSON.parse(saved));
     return true;
   } catch(e) { return false; }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  const hasSaved = loadState();
+// Автосинхронизация — тянем изменения каждые 10 сек
+function startPolling() {
+  setInterval(async () => {
+    if (pendingSave) return; // Не тянем пока сами пишем
+    try {
+      const res = await fetch(`${AT_URL}?filterByFormula=%7Bkey%7D%3D%22tournament%22`, { headers: AT_HEADS });
+      const json = await res.json();
+      if (json.records && json.records.length > 0) {
+        const rec = json.records[0];
+        atRecordId = rec.id;
+        const remoteData = rec.fields.data;
+        const localData = localStorage.getItem('fifa_current');
+        if (remoteData && remoteData !== localData) {
+          Object.assign(T, JSON.parse(remoteData));
+          localStorage.setItem('fifa_current', remoteData);
+          // Перерисовываем текущий экран
+          const step = T.currentStep || 1;
+          if (step === 4 && T.groups.length) { renderGroupTabs(); switchGroupTab(T.currentGroupTab || 0); checkAllGroupsDone(); }
+          if (step === 5) renderPlayoff();
+        }
+      }
+    } catch(e) {}
+  }, 10000);
+}
+
+
+document.addEventListener('DOMContentLoaded', async function() {
+  const hasSaved = await loadState();
 
   if (hasSaved && T.format) {
     document.getElementById('btn-1v1').classList.toggle('active', T.mode === '1v1');
@@ -1159,6 +1230,7 @@ document.addEventListener('DOMContentLoaded', function() {
     renderFormatGrid();
     selectFormat('20de');
   }
+  startPolling();
 });
 </script>
 </body>
