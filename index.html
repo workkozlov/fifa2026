@@ -249,6 +249,10 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 <div class="page" id="page-4">
   <div class="section-title">Групповой этап</div>
   <div class="section-sub">Вводите результаты матчей</div>
+  <div id="view-nav" style="display:none;margin-bottom:16px;display:none">
+    <button class="tab active" onclick="goStep(4)" style="font-size:13px;padding:8px 18px">4. Матчи</button>
+    <button class="tab" onclick="goStep(5)" style="font-size:13px;padding:8px 18px">5. Плей-офф</button>
+  </div>
   <div class="tabs" id="group-tabs"></div>
   <div id="group-standings"></div>
   <div id="group-matches"></div>
@@ -262,6 +266,10 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 <!-- PAGE 5: PLAYOFF -->
 <div class="page" id="page-5">
   <div class="section-title">Плей-офф</div>
+  <div id="view-nav-5" style="display:none;margin-bottom:16px">
+    <button class="tab" onclick="goStep(4)" style="font-size:13px;padding:8px 18px">4. Матчи</button>
+    <button class="tab active" onclick="goStep(5)" style="font-size:13px;padding:8px 18px">5. Плей-офф</button>
+  </div>
   <div class="section-sub" id="playoff-sub"></div>
   <div id="playoff-qualifiers" style="margin-bottom:16px"></div>
   <div class="bracket-wrap">
@@ -550,12 +558,17 @@ function renderGroupMatchList() {
     const at = g.teams[m.away].name;
     const hv = m.homeScore !== null ? m.homeScore : '';
     const av = m.awayScore !== null ? m.awayScore : '';
+    const isView = document.body.classList.contains('view-mode');
     html += `<div class="match-row ${m.done ? 'match-done' : ''}">
       <span class="match-team">${ht}</span>
       <div class="score-inputs">
-        <input class="score-input" type="number" min="0" max="99" value="${hv}" placeholder="—" id="s-${gi}-${mi}-h" onchange="saveScore(${gi},${mi})">
+        ${isView
+          ? `<span class="score-input" style="display:inline-flex;align-items:center;justify-content:center;min-width:36px;font-weight:700;font-size:15px;color:${m.done?'var(--text)':'var(--muted)'}">${m.done ? hv : '—'}</span>`
+          : `<input class="score-input" type="number" min="0" max="99" value="${hv}" placeholder="—" id="s-${gi}-${mi}-h" onchange="saveScore(${gi},${mi})">`}
         <span class="score-sep">:</span>
-        <input class="score-input" type="number" min="0" max="99" value="${av}" placeholder="—" id="s-${gi}-${mi}-a" onchange="saveScore(${gi},${mi})">
+        ${isView
+          ? `<span class="score-input" style="display:inline-flex;align-items:center;justify-content:center;min-width:36px;font-weight:700;font-size:15px;color:${m.done?'var(--text)':'var(--muted)'}">${m.done ? av : '—'}</span>`
+          : `<input class="score-input" type="number" min="0" max="99" value="${av}" placeholder="—" id="s-${gi}-${mi}-a" onchange="saveScore(${gi},${mi})">`}
       </div>
       <span class="match-team right">${at}</span>
     </div>`;
@@ -1324,6 +1337,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Block navigation to steps other than 4 and 5
     const _goStep = window.goStep;
     window.goStep = function(n) { if (n === 4 || n === 5) _goStep(n); };
+    // Show view-mode tab switchers
+    document.getElementById('view-nav').style.display = 'block';
+    document.getElementById('view-nav-5').style.display = 'block';
   }
   const hasSaved = await loadState();
 
