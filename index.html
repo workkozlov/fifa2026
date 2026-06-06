@@ -563,11 +563,11 @@ function renderGroupMatchList() {
       <span class="match-team">${ht}</span>
       <div class="score-inputs">
         ${isView
-          ? `<span class="score-input" style="display:inline-flex;align-items:center;justify-content:center;min-width:36px;font-weight:700;font-size:15px;color:${m.done?'var(--text)':'var(--muted)'}">${m.homeScore !== null ? m.homeScore : '—'}</span>`
+          ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:36px;font-weight:700;font-size:15px;color:${typeof m.homeScore==='number'?'var(--text)':'var(--muted)'}">${typeof m.homeScore === 'number' ? m.homeScore : '—'}</span>`
           : `<input class="score-input" type="number" min="0" max="99" value="${hv}" placeholder="—" id="s-${gi}-${mi}-h" onchange="saveScore(${gi},${mi})">`}
         <span class="score-sep">:</span>
         ${isView
-          ? `<span class="score-input" style="display:inline-flex;align-items:center;justify-content:center;min-width:36px;font-weight:700;font-size:15px;color:${m.done?'var(--text)':'var(--muted)'}">${m.awayScore !== null ? m.awayScore : '—'}</span>`
+          ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:36px;font-weight:700;font-size:15px;color:${typeof m.awayScore==='number'?'var(--text)':'var(--muted)'}">${typeof m.awayScore === 'number' ? m.awayScore : '—'}</span>`
           : `<input class="score-input" type="number" min="0" max="99" value="${av}" placeholder="—" id="s-${gi}-${mi}-a" onchange="saveScore(${gi},${mi})">`}
       </div>
       <span class="match-team right">${at}</span>
