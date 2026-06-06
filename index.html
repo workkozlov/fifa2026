@@ -1290,6 +1290,10 @@ async function loadState() {
         // Синхронизируем с localStorage
         localStorage.setItem('fifa_current', rec.fields.data);
         return true;
+      } else {
+        // Airtable есть но data пустое — сбрасываем localStorage тоже
+        localStorage.removeItem('fifa_current');
+        return false;
       }
     }
   } catch(e) { console.warn('Airtable load failed, using localStorage', e); }
@@ -1314,6 +1318,12 @@ function startPolling() {
         atRecordId = rec.id;
         const remoteData = rec.fields.data;
         const localData = localStorage.getItem('fifa_current');
+        if (!remoteData && localData) {
+          // Airtable очищен — сбрасываем локальный кэш и перезагружаем
+          localStorage.removeItem('fifa_current');
+          location.reload();
+          return;
+        }
         if (remoteData && remoteData !== localData) {
           Object.assign(T, JSON.parse(remoteData));
           localStorage.setItem('fifa_current', remoteData);
