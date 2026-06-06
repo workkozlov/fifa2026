@@ -1214,10 +1214,11 @@ function resetTournament() {
 function goStep(n) {
   if (n === 2 && !T.format) { alert('Выберите схему на шаге 1'); return; }
   if (n >= 2 && n <= 5) buildTeamInputs();
-  if (n === 4) { renderGroupTabs(); switchGroupTab(0); }
+  if (n === 4) { renderGroupTabs(); switchGroupTab(T.currentGroupTab || 0); }
+  if (n === 5) renderPlayoff();
   if (n === 6) renderHistory();
   T.currentStep = n;
-  saveState();
+  if (!document.body.classList.contains('view-mode')) saveState();
   document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i === n-1));
   document.querySelectorAll('.step').forEach((s,i) => {
     s.classList.toggle('active', i === n-1);
@@ -1282,7 +1283,7 @@ async function loadState() {
     const json = await res.json();
     if (json.records && json.records.length > 0) {
       const rec = json.records[0];
-      atRecordId = rec.id;
+      atRecordId = rec.id; // всегда сохраняем ID, даже если data пустое
       if (rec.fields.data) {
         const s = JSON.parse(rec.fields.data);
         Object.assign(T, s);
@@ -1335,9 +1336,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Disable dynamically created inputs via event delegation
     document.body.addEventListener('change', e => { if (e.target.classList.contains('score-input')) e.stopImmediatePropagation(); }, true);
     document.body.addEventListener('click', e => { if (e.target.closest('.format-card')) e.stopImmediatePropagation(); }, true);
-    // Block navigation to steps other than 4 and 5
-    const _goStep = window.goStep;
-    window.goStep = function(n) { if (n === 4 || n === 5) _goStep(n); };
     // Show view-mode tab switchers
     document.getElementById('view-nav').style.display = 'block';
     document.getElementById('view-nav-5').style.display = 'block';
