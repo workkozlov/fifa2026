@@ -23,8 +23,27 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
 
-/* Header */
-header { padding: 20px 24px 0; display: flex; align-items: center; gap: 12px; }
+/* View-only mode */
+body.view-mode .btn,
+body.view-mode button:not(.tab):not(.type-btn),
+body.view-mode .step-indicator,
+body.view-mode .score-input,
+body.view-mode .format-card,
+body.view-mode #team-inputs,
+body.view-mode [onclick*="reset"],
+body.view-mode [onclick*="random"] { display: none !important; }
+body.view-mode .score-input { pointer-events: none; opacity: 0.5; }
+body.view-mode .step:not(#step-4):not(#step-5) { pointer-events: none; opacity: 0.3; cursor: default; }
+body.view-mode header::after {
+  content: '👁 Режим просмотра';
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(255,255,255,0.05);
+  border: 0.5px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 10px;
+  margin-left: 8px;
+}
 .logo { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--accent); }
 .logo span { color: var(--muted); }
 .step-indicator { display: flex; gap: 0; margin-left: auto; }
@@ -1296,6 +1315,16 @@ function startPolling() {
 
 
 document.addEventListener('DOMContentLoaded', async function() {
+  // View-only mode: ?view or ?view=1
+  if (new URLSearchParams(location.search).has('view')) {
+    document.body.classList.add('view-mode');
+    // Disable dynamically created inputs via event delegation
+    document.body.addEventListener('change', e => { if (e.target.classList.contains('score-input')) e.stopImmediatePropagation(); }, true);
+    document.body.addEventListener('click', e => { if (e.target.closest('.format-card')) e.stopImmediatePropagation(); }, true);
+    // Block navigation to steps other than 4 and 5
+    const _goStep = window.goStep;
+    window.goStep = function(n) { if (n === 4 || n === 5) _goStep(n); };
+  }
   const hasSaved = await loadState();
 
   if (hasSaved && T.format) {
