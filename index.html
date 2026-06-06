@@ -244,7 +244,7 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 <div class="page" id="page-5">
   <div class="section-title">Плей-офф</div>
   <div class="section-sub" id="playoff-sub"></div>
-  <div id="playoff-qualifiers" class="notice" style="margin-bottom:16px"></div>
+  <div id="playoff-qualifiers" style="margin-bottom:16px"></div>
   <div class="bracket-wrap">
     <div class="bracket" id="bracket"></div>
   </div>
@@ -642,11 +642,11 @@ function buildDEBracket() {
       if (r[3]) fourths.push({ name: r[3].name, seed: `4${g.name}`, pts: r[3].pts, gd: r[3].gf - r[3].ga });
     });
     // Sort seconds by pts/gd to pick best 3
-    seconds.sort((a, b) => b.pts - a.pts || b.gd - a.gd);
+    seconds.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
     const best3seconds = seconds.slice(0, 3);
     const rest2seconds = seconds.slice(3);
     // Sort fourths, best 1 goes to LB
-    fourths.sort((a, b) => b.pts - a.pts || b.gd - a.gd);
+    fourths.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
     const best1fourth = fourths.slice(0, 1);
 
     // WB: 5 firsts + 3 best seconds = 8
@@ -687,10 +687,119 @@ function buildDEBracket() {
 function renderDE() {
   const f = FORMATS[T.mode][T.format];
   document.getElementById('playoff-sub').textContent = 'Double Elimination — Winners & Losers bracket';
-  document.getElementById('playoff-qualifiers').innerHTML =
-    '<strong style="color:var(--accent)">WB:</strong> ' + T.wb[0].flatMap(m => [m.home?.name, m.away?.name]).filter(Boolean).join(' · ') +
-    ' &nbsp;|&nbsp; <strong style="color:var(--danger)">LB:</strong> ' + T.lb[0].flatMap(m => [m.home?.name, m.away?.name]).filter(Boolean).join(' · ') +
-    (f.de20 ? ' &nbsp;|&nbsp; <strong style="color:var(--muted)">Выбыли:</strong> <span style="color:var(--muted)">4 худших 4-х места</span>' : '');
+  // Build visual qualification grid
+  {
+    const qEl = document.getElementById('playoff-qualifiers');
+    
+    // Collect per-group placement data
+    const groupData = T.groups.map((g, gi) => {
+      const ranked = getGroupRanked(gi);
+      return { name: g.name, ranked };
+    });
+
+    // Determine which players ended up where
+    const wbNames = new Set(T.wb[0].flatMap(m => [m.home?.name, m.away?.name]).filter(Boolean));
+    const lbNames = new Set(T.lb[0].flatMap(m => [m.home?.name, m.away?.name]).filter(Boolean));
+
+    // Position labels and styles
+    const posStyle = [
+      { label: '1-е место', color: 'var(--accent)', bg: 'rgba(0,229,160,0.08)', border: 'rgba(0,229,160,0.25)' },
+      { label: '2-е место', color: 'var(--warn)',   bg: 'rgba(255,179,71,0.08)', border: 'rgba(255,179,71,0.25)' },
+      { label: '3-е место', color: 'var(--danger)', bg: 'rgba(255,77,109,0.08)', border: 'rgba(255,77,109,0.25)' },
+      { label: '4-е место', color: 'var(--muted)',  bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.1)' },
+    ];
+
+    // Legend
+    let html = `<div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-right:4px">Отбор:</span>
+      <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(0,229,160,0.12);color:var(--accent);border:0.5px solid rgba(0,229,160,0.3)">⬆ Winners Bracket</span>
+      <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(255,77,109,0.1);color:var(--danger);border:0.5px solid rgba(255,77,109,0.25)">⬇ Losers Bracket</span>
+      <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,0.04);color:var(--muted);border:0.5px solid rgba(255,255,255,0.1)">✕ Выбыл</span>
+    </div>`;
+
+    // Helper: render one player card
+    function playerCard(t, ps, dest, destStyle) {
+      if (!t) return `<div style="background:rgba(255,255,255,0.02);border:0.5px dashed rgba(255,255,255,0.08);border-radius:8px;padding:6px 10px;color:var(--muted);font-size:11px">—</div>`;
+      const gd = t.gf - t.ga;
+      return `<div style="background:${ps.bg};border:0.5px solid ${ps.border};border-radius:8px;padding:6px 10px;display:flex;align-items:center;justify-content:space-between;gap:6px">
+        <span style="font-size:12px;font-weight:500;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.name}</span>
+        <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0">
+          <span style="${destStyle};font-weight:600">${dest}</span>
+          <span style="font-size:10px;color:var(--muted)">${t.pts}о · ${t.gf}-${t.ga}=${gd > 0 ? '+' : ''}${gd}</span>
+        </span>
+      </div>`;
+    }
+
+    function getDest(t) {
+      if (!t) return { dest: '', destStyle: '' };
+      if (wbNames.has(t.name)) return { dest: '⬆ WB', destStyle: 'color:var(--accent);font-size:10px' };
+      if (lbNames.has(t.name)) return { dest: '⬇ LB', destStyle: 'color:var(--danger);font-size:10px' };
+      return { dest: '✕', destStyle: 'color:var(--muted);font-size:10px' };
+    }
+
+    // For pos 0–2: rows ordered by group (A→E)
+    // For pos 3 (4th place): rows sorted best→worst so qualifier is on top
+    const fourthsSorted = [...groupData].sort((a, b) => {
+      const ta = a.ranked[3], tb = b.ranked[3];
+      if (!ta && !tb) return 0;
+      if (!ta) return 1;
+      if (!tb) return -1;
+      return tb.pts - ta.pts || (tb.gf - tb.ga) - (ta.gf - ta.ga) || tb.gf - ta.gf;
+    });
+
+    // Grid: rows = groups, columns = places 1–4
+    html += `<div style="overflow-x:auto;margin-bottom:20px">`;
+    html += `<table style="border-collapse:collapse;width:100%;min-width:520px">`;
+    
+    // Header row
+    html += `<thead><tr>`;
+    html += `<th style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:6px 10px 8px;text-align:left;font-weight:500;width:80px">Группа</th>`;
+    posStyle.forEach(p => {
+      html += `<th style="font-size:11px;color:${p.color};text-transform:uppercase;letter-spacing:.06em;padding:6px 10px 8px;text-align:left;font-weight:500">${p.label}</th>`;
+    });
+    html += `</tr></thead>`;
+
+    html += `<tbody>`;
+    groupData.forEach((gd, gi) => {
+      const gd4 = fourthsSorted[gi]; // 4th place column uses sorted order
+      html += `<tr>`;
+      // Group label — for cols 0-2 show current group, for col 3 show sorted group
+      html += `<td style="padding:5px 10px;font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--accent);letter-spacing:1px;vertical-align:middle">GRP ${gd.name}</td>`;
+      for (let pos = 0; pos < 3; pos++) {
+        const t = gd.ranked[pos];
+        const ps = posStyle[pos];
+        const { dest, destStyle } = getDest(t);
+        html += `<td style="padding:4px 6px;vertical-align:middle">${playerCard(t, ps, dest, destStyle)}</td>`;
+      }
+      // 4th place column — sorted independently, show group name inside card
+      const t4 = gd4?.ranked[3];
+      const ps4 = posStyle[3];
+      const { dest: dest4, destStyle: destStyle4 } = getDest(t4);
+      const isQualifier4 = t4 && lbNames.has(t4.name);
+      const border4 = isQualifier4 ? 'rgba(255,77,109,0.5)' : ps4.border;
+      html += `<td style="padding:4px 6px;vertical-align:middle">`;
+      if (t4) {
+        const gd4val = t4.gf - t4.ga;
+        html += `<div style="background:${ps4.bg};border:0.5px solid ${border4};border-radius:8px;padding:6px 10px;display:flex;align-items:center;justify-content:space-between;gap:6px">
+          <span style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0">
+            <span style="font-size:10px;color:var(--muted);font-family:'Bebas Neue',sans-serif;letter-spacing:1px">GRP ${gd4.name}</span>
+            <span style="font-size:12px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t4.name}</span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0">
+            <span style="${destStyle4};font-weight:600">${dest4}</span>
+            <span style="font-size:10px;color:var(--muted)">${t4.pts}о · ${t4.gf}-${t4.ga}=${gd4val > 0 ? '+' : ''}${gd4val}</span>
+          </span>
+        </div>`;
+      } else {
+        html += `<div style="background:rgba(255,255,255,0.02);border:0.5px dashed rgba(255,255,255,0.08);border-radius:8px;padding:6px 10px;color:var(--muted);font-size:11px">—</div>`;
+      }
+      html += `</td>`;
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div>`;
+
+    qEl.innerHTML = html;
+  }
   const bracket = document.getElementById('bracket');
   bracket.innerHTML = '';
 
